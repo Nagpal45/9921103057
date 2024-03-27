@@ -2,16 +2,62 @@ const { default: axios } = require('axios');
 const express = require('express');
 const { config } = require('dotenv');
 const { v4: uuidv4 } = require('uuid');
+const cors = require('cors');
 
 config();
 
 const app = express();
 app.use(express.json());
+app.use(cors());
 
 const API_BASE_URL = 'http://20.244.56.144/test';
 const companies = ["AMZ", "FLP", "SNP", "MYN", "AZO"];
 
 let allProducts = []; 
+
+app.get('/api/products', async (req, res) => {
+    try {
+        const { company, minPrice, maxPrice, rating, category, availability, page, sort} = req.query;
+
+        const selectedCompanies = company ? [company] : companies;
+
+        allProducts = [];
+
+        for (const company of selectedCompanies) {
+            let url = `${API_BASE_URL}/companies/${company}/categories/${category}/products?top=10&`;
+
+            if (minPrice) url += `minPrice=${minPrice}&`;
+            if (maxPrice) url += `maxPrice=${maxPrice}&`;
+            if (rating) url += `rating=${rating}&`;
+            if (availability) url += `availability=${availability}&`;
+            if (page) url += `page=${page}&`;
+            if (sort) url += `sort=${sort}&`;
+
+            const response = await axios.get(url, {
+                headers: {
+                    'Authorization': `Bearer ${process.env.ACCESS_TOKEN}`
+                }
+            });
+
+            const products = response.data.map(product => ({
+                id: uuidv4(),
+                name: product.productName,
+                price: product.price,
+                rating: product.rating,
+                discount: product.discount,
+                availability: product.availability,
+                company: company,
+            }));
+
+            allProducts.push(...products);
+        }
+
+        res.json(allProducts);
+    } catch (error) {
+        console.error('Error fetching data:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
 
 app.get('/categories/:categoryName/products', async (req, res) => {
     try {
